@@ -1,6 +1,6 @@
-# HTML WYSIWYG Editor
+# HTML Live Edit
 
-A VSCode/Trae extension for visual WYSIWYG editing of HTML files. Edit text directly on the rendered page without touching the source code.
+A VSCode/Trae extension for visual WYSIWYG editing of HTML files. Double-click text to edit directly on the rendered page.
 
 ## Features
 
@@ -22,8 +22,8 @@ A VSCode/Trae extension for visual WYSIWYG editing of HTML files. Edit text dire
 ### Build from source
 
 ```bash
-git clone https://github.com/JunbiaoXue/html-wysiwyg-editor.git
-cd html-wysiwyg-editor
+git clone https://github.com/JunbiaoXue/html-live-edit.git
+cd html-live-edit
 npm install
 npm run compile
 npx vsce package
@@ -45,13 +45,6 @@ npx vsce package
 - Table cells: `td`, `th`
 - Inline text: `span`, `strong`, `em`, `b`, `i`, `a`
 - Containers: `div`, `blockquote`, `label`, `figcaption`
-- Special boxes: `.highlight-box`, `.mechanism-box`, etc.
-
-## Keyboard Shortcuts
-
-- **Double-click**: Enter edit mode for clicked element
-- **Click outside**: Exit edit mode for current element
-- **Save button**: Save all changes
 
 ## Requirements
 
@@ -60,7 +53,3 @@ npx vsce package
 ## License
 
 MIT
-
-## Repository
-
-[https://github.com/JunbiaoXue/html-wysiwyg-editor](https://github.com/JunbiaoXue/html-wysiwyg-editor)

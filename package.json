@@ -1,7 +1,7 @@
 {
-  "name": "html-wysiwyg-editor",
-  "displayName": "HTML WYSIWYG Editor",
-  "description": "Visual WYSIWYG editor for HTML files - edit text and images directly on the rendered page",
+  "name": "html-live-edit",
+  "displayName": "HTML Live Edit",
+  "description": "Visual WYSIWYG editor for HTML files - double-click text to edit directly on the rendered page",
   "version": "1.0.0",
   "publisher": "xjb",
   "icon": "media/icon.png",
