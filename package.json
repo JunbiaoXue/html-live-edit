@@ -1,0 +1,64 @@
+{
+  "name": "html-wysiwyg-editor",
+  "displayName": "HTML WYSIWYG Editor",
+  "description": "Visual WYSIWYG editor for HTML files - edit text and images directly on the rendered page",
+  "version": "1.0.0",
+  "publisher": "xjb",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCustomEditor:htmlWysiwyg.editor"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "htmlWysiwyg.editor",
+        "displayName": "HTML Visual Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.html"
+          },
+          {
+            "filenamePattern": "*.htm"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "htmlWysiwyg.openEditor",
+        "title": "Open HTML Visual Editor",
+        "category": "HTML Editor",
+        "icon": "media/icon.png"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "htmlWysiwyg.openEditor",
+          "when": "resourceExtname == .html || resourceExtname == .htm",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.74.0",
+    "@vscode/vsce": "^2.0.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="pen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24"/>
+      <stop offset="100%" style="stop-color:#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="url(#bg)"/>
+  <!-- HTML bracket -->
+  <text x="28" y="85" font-family="monospace" font-size="52" font-weight="bold" fill="rgba(255,255,255,0.9)">&lt;/&gt;</text>
+  <!-- Pen -->
+  <g transform="translate(72, 20) rotate(45)">
+    <rect x="0" y="0" width="12" height="48" rx="2" fill="url(#pen)"/>
+    <polygon points="0,48 6,58 12,48" fill="#f59e0b"/>
+    <rect x="0" y="0" width="12" height="8" rx="2" fill="#fcd34d"/>
+  </g>
+  <!-- Eye icon (view) -->
+  <g transform="translate(16, 88)">
+    <ellipse cx="16" cy="10" rx="16" ry="10" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
+    <circle cx="16" cy="10" r="5" fill="rgba(255,255,255,0.7)"/>
+  </g>
+</svg>
