@@ -1,15 +1,26 @@
 {
   "name": "html-live-edit",
   "displayName": "HTML Live Edit",
-  "description": "Visual WYSIWYG editor for HTML files - double-click text to edit directly on the rendered page",
-  "version": "1.0.0",
+  "description": "Visual WYSIWYG editor for HTML files - double-click text to edit, source view, undo/redo, zoom, image replacement",
+  "version": "1.1.0",
   "publisher": "xjb",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JunbiaoXue/html-live-edit.git"
+  },
   "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "html",
+    "wysiwyg",
+    "visual editor",
+    "live edit",
+    "preview"
   ],
   "activationEvents": [
     "onCustomEditor:htmlWysiwyg.editor"
@@ -47,7 +58,15 @@
           "group": "navigation"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "htmlWysiwyg.openEditor",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceExtname == .html || resourceExtname == .htm"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
