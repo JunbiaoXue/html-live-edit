@@ -29,7 +29,7 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
     };
 
     const htmlContent = fs.readFileSync(document.uri.fsPath, 'utf-8');
-    webviewPanel.webview.html = this.getHtmlContent(webviewPanel.webview, htmlContent, document.uri);
+    webviewPanel.webview.html = this.buildEditorHtml(webviewPanel.webview, htmlContent, document.uri);
 
     webviewPanel.webview.onDidReceiveMessage(
       async (message) => {
@@ -61,603 +61,568 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
     fs.writeFileSync(uri.fsPath, content, 'utf-8');
   }
 
-  private getHtmlContent(webview: vscode.Webview, htmlContent: string, documentUri: vscode.Uri): string {
+  private buildEditorHtml(webview: vscode.Webview, htmlContent: string, documentUri: vscode.Uri): string {
     const nonce = this.getNonce();
     const baseUri = webview.asWebviewUri(documentUri.with({
       path: documentUri.path.substring(0, documentUri.path.lastIndexOf('/') + 1)
     }));
     const fileName = documentUri.path.split('/').pop() || 'document.html';
 
-    // Parse the original HTML to extract head and body separately
+    // Parse original HTML into parts
+    const doctypeMatch = htmlContent.match(/<!DOCTYPE[^>]*>/i);
+    const htmlOpenMatch = htmlContent.match(/<html([^>]*)>/i);
     const headMatch = htmlContent.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+    const bodyOpenMatch = htmlContent.match(/<body([^>]*)>/i);
     const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const htmlAttr = htmlContent.match(/<html([^>]*)>/i);
-    const headContent = headMatch ? headMatch[1] : '';
-    const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
-    const htmlLang = htmlAttr ? htmlAttr[1] : ' lang="zh-CN"';
 
-    return `<!DOCTYPE html>
-<html${htmlLang}>
+    const doctype = doctypeMatch ? doctypeMatch[0] : '<!DOCTYPE html>';
+    const htmlAttrs = htmlOpenMatch ? htmlOpenMatch[1] : '';
+    const headContent = headMatch ? headMatch[1] : '';
+    const bodyAttrs = bodyOpenMatch ? bodyOpenMatch[1] : '';
+    const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
+
+    // Reconstruct: inject our chrome into the original HTML structure
+    // This ensures the page renders exactly as the author intended
+    return `${doctype}
+<html${htmlAttrs}>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none';
           img-src ${webview.cspSource} https: data: blob:;
           script-src 'nonce-${nonce}' 'unsafe-inline';
           style-src 'unsafe-inline' ${webview.cspSource} https:;
           font-src ${webview.cspSource} https:;">
     <base href="${baseUri}">
-
-    <!-- Original head content (styles, fonts, etc.) -->
     ${headContent}
 
-    <style>
-      /* ─── Editor Chrome (toolbar, statusbar) ─── */
-      .hle-toolbar {
-        position: sticky;
-        top: 0;
-        left: 0; right: 0;
-        height: 44px;
-        background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
-        z-index: 10000;
-        gap: 8px;
-        box-shadow: 0 2px 16px rgba(0,0,0,0.4);
-        user-select: none;
-        flex-shrink: 0;
+    <!-- === HLE Editor Chrome Styles === -->
+    <style id="hle-styles">
+      /* Toolbar - sits on top of everything */
+      #hle-toolbar {
+        all: initial;
+        position: fixed !important;
+        top: 0 !important; left: 0 !important; right: 0 !important;
+        height: 42px !important;
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 12px !important;
+        z-index: 999999 !important;
+        gap: 6px !important;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.4) !important;
+        user-select: none !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 12px !important;
+        color: #e2e8f0 !important;
       }
 
-      .hle-toolbar-logo {
-        width: 28px; height: 28px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        border-radius: 6px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 14px; flex-shrink: 0;
+      #hle-toolbar * {
+        all: initial;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 12px !important;
+        box-sizing: border-box !important;
       }
 
-      .hle-toolbar-title {
-        color: #e2e8f0; font-size: 13px; font-weight: 600; white-space: nowrap;
+      #hle-toolbar .hle-logo {
+        width: 26px !important; height: 26px !important;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        border-radius: 5px !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        font-size: 13px !important; flex-shrink: 0 !important;
       }
 
-      .hle-toolbar-divider {
-        width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0;
+      #hle-toolbar .hle-title {
+        color: #e2e8f0 !important; font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important;
       }
 
-      .hle-toolbar button {
-        background: rgba(255,255,255,0.08);
-        color: #cbd5e1;
-        border: 1px solid rgba(255,255,255,0.12);
-        padding: 5px 12px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 12px; font-weight: 500;
-        transition: all 0.15s;
-        white-space: nowrap;
-        display: flex; align-items: center; gap: 4px;
+      #hle-toolbar .hle-divider {
+        width: 1px !important; height: 18px !important; background: rgba(255,255,255,0.15) !important; flex-shrink: 0 !important;
       }
 
-      .hle-toolbar button:hover {
-        background: rgba(255,255,255,0.15); color: #fff;
+      #hle-toolbar button {
+        background: rgba(255,255,255,0.08) !important;
+        color: #cbd5e1 !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
+        padding: 4px 10px !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        font-weight: 500 !important;
+        white-space: nowrap !important;
+        display: inline-flex !important; align-items: center !important; gap: 3px !important;
+        line-height: 1 !important;
+        height: auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+        margin: 0 !important;
       }
 
-      .hle-toolbar button.hle-active {
-        background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
-        border-color: transparent; color: #fff;
-        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+      #hle-toolbar button:hover {
+        background: rgba(255,255,255,0.15) !important; color: #fff !important;
       }
 
-      .hle-toolbar button.hle-save-btn {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        border-color: transparent; color: #fff;
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      #hle-toolbar button.hle-active {
+        background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%) !important;
+        border-color: transparent !important; color: #fff !important;
       }
 
-      .hle-toolbar button.hle-save-btn:hover {
-        background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      #hle-toolbar button.hle-save {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        border-color: transparent !important; color: #fff !important;
+      }
+      #hle-toolbar button.hle-save:hover {
+        background: linear-gradient(135deg, #34d399 0%, #10b981 100%) !important;
       }
 
-      .hle-spacer { flex: 1; }
+      #hle-toolbar .hle-spacer { flex: 1 !important; }
 
-      .hle-zoom-control { display: flex; align-items: center; gap: 2px; }
-      .hle-zoom-control button { padding: 4px 8px !important; font-size: 14px !important; min-width: 28px; justify-content: center; }
-      .hle-zoom-value { color: #94a3b8; font-size: 11px; min-width: 36px; text-align: center; }
-
-      .hle-info-badge {
-        background: rgba(255,255,255,0.08); color: #94a3b8;
-        padding: 3px 10px; border-radius: 10px; font-size: 11px; white-space: nowrap;
+      #hle-toolbar .hle-badge {
+        padding: 2px 8px !important; border-radius: 8px !important;
+        font-size: 11px !important; white-space: nowrap !important;
+        background: rgba(255,255,255,0.08) !important; color: #94a3b8 !important;
       }
-      .hle-info-badge.hle-editing-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-      .hle-info-badge.hle-saved-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-      .hle-info-badge.hle-dirty-badge { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-
-      /* ─── Source Editor ─── */
-      .hle-source-editor {
-        display: none;
-        width: 100%; height: calc(100vh - 44px - 26px);
-        background: #1e1e2e;
-        overflow: auto;
+      #hle-toolbar .hle-badge.hle-badge-edit {
+        background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important;
+      }
+      #hle-toolbar .hle-badge.hle-badge-saved {
+        background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important;
+      }
+      #hle-toolbar .hle-badge.hle-badge-dirty {
+        background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important;
       }
 
-      .hle-source-editor textarea {
-        width: 100%; min-height: 100%;
-        background: #1e1e2e; color: #e2e8f0;
-        border: none; padding: 16px;
-        font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-        font-size: 13px; line-height: 1.6;
-        resize: none; outline: none; tab-size: 2;
+      #hle-toolbar .hle-zoom {
+        display: inline-flex !important; align-items: center !important; gap: 2px !important;
+      }
+      #hle-toolbar .hle-zoom button { padding: 3px 6px !important; font-size: 13px !important; min-width: 24px !important; justify-content: center !important; }
+      #hle-toolbar .hle-zoom-val { color: #94a3b8 !important; font-size: 11px !important; min-width: 34px !important; text-align: center !important; }
+
+      /* Body push-down for toolbar */
+      body.hle-body { padding-top: 42px !important; padding-bottom: 24px !important; }
+
+      /* Status bar */
+      #hle-statusbar {
+        all: initial;
+        position: fixed !important;
+        bottom: 0 !important; left: 0 !important; right: 0 !important;
+        height: 24px !important;
+        background: #0f0f23 !important;
+        border-top: 1px solid rgba(255,255,255,0.08) !important;
+        display: flex !important; align-items: center !important;
+        padding: 0 10px !important; gap: 14px !important;
+        z-index: 999999 !important; user-select: none !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 11px !important; color: #64748b !important;
       }
 
-      .hle-source-editor textarea::selection { background: rgba(99, 102, 241, 0.3); }
+      #hle-statusbar * { all: initial; font-size: 11px !important; }
 
-      /* ─── Status Bar ─── */
-      .hle-status-bar {
-        position: sticky;
-        bottom: 0; left: 0; right: 0;
-        height: 26px;
-        background: #0f0f23;
-        border-top: 1px solid rgba(255,255,255,0.08);
-        display: flex; align-items: center;
-        padding: 0 12px; gap: 16px;
-        z-index: 10000; user-select: none;
-        flex-shrink: 0;
+      .hle-dot {
+        width: 6px !important; height: 6px !important; border-radius: 50% !important;
+        background: #475569 !important; display: inline-block !important;
       }
+      .hle-dot.hle-dot-on { background: #10b981 !important; box-shadow: 0 0 6px rgba(16,185,129,0.5) !important; }
+      .hle-dot.hle-dot-edit { background: #f59e0b !important; box-shadow: 0 0 6px rgba(245,158,11,0.5) !important; }
 
-      .hle-status-item { color: #64748b; font-size: 11px; display: flex; align-items: center; gap: 5px; }
-      .hle-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #475569; }
-      .hle-status-dot.hle-dot-active { background: #10b981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.5); }
-      .hle-status-dot.hle-dot-editing { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
-      .hle-status-spacer { flex: 1; }
-
-      /* ─── Element Tooltip ─── */
-      .hle-element-tooltip {
-        display: none; position: fixed; z-index: 9999;
-        background: #1e1e2e; color: #e2e8f0;
-        padding: 6px 10px; border-radius: 6px; font-size: 11px;
-        font-family: 'JetBrains Mono', monospace;
-        border: 1px solid rgba(255,255,255,0.15);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        pointer-events: none; max-width: 400px; word-break: break-all;
+      /* Source editor */
+      #hle-source-wrap {
+        all: initial;
+        display: none !important;
+        position: fixed !important;
+        top: 42px !important; bottom: 24px !important; left: 0 !important; right: 0 !important;
+        z-index: 999998 !important;
+        background: #1e1e2e !important;
       }
-      .hle-element-tooltip .hle-tag-name { color: #818cf8; font-weight: 600; }
-      .hle-element-tooltip .hle-class-name { color: #34d399; }
-      .hle-element-tooltip .hle-char-count { color: #94a3b8; margin-left: 8px; }
+      #hle-source-wrap textarea {
+        all: initial;
+        width: 100% !important; height: 100% !important;
+        background: #1e1e2e !important; color: #e2e8f0 !important;
+        border: none !important; padding: 16px !important;
+        font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
+        font-size: 13px !important; line-height: 1.6 !important;
+        resize: none !important; outline: none !important; tab-size: 2 !important;
+        box-sizing: border-box !important;
+        display: block !important;
+      }
+      #hle-source-wrap textarea::selection { background: rgba(99,102,241,0.3) !important; }
 
-      /* ─── Editable Elements ─── */
-      .hle-editable {
+      /* Editable highlight */
+      .hle-el {
         cursor: pointer !important;
         outline: 2px dashed transparent !important;
         outline-offset: 2px !important;
-        transition: outline-color 0.15s, background 0.15s !important;
-        border-radius: 2px !important;
+        transition: outline-color 0.15s, background-color 0.15s !important;
       }
-      .hle-editable:hover {
+      .hle-el:hover {
         outline-color: #6366f1 !important;
-        background: rgba(99, 102, 241, 0.06) !important;
+        background-color: rgba(99,102,241,0.06) !important;
       }
-      .hle-editing {
+      .hle-el.hle-el-active {
         outline: 2px solid #6366f1 !important;
-        background: rgba(99, 102, 241, 0.08) !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+        background-color: rgba(99,102,241,0.08) !important;
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
         cursor: text !important;
       }
 
-      .hle-img-editable {
+      .hle-img {
         cursor: pointer !important;
         outline: 3px dashed transparent !important;
         outline-offset: 3px !important;
-        transition: outline-color 0.15s !important;
       }
-      .hle-img-editable:hover { outline-color: #8b5cf6 !important; }
-      .hle-img-editing {
+      .hle-img:hover { outline-color: #8b5cf6 !important; }
+      .hle-img.hle-img-active {
         outline: 3px solid #8b5cf6 !important;
-        box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2) !important;
+        box-shadow: 0 0 0 4px rgba(139,92,246,0.2) !important;
       }
 
-      /* ─── Content wrapper for zoom ─── */
-      .hle-content-wrapper {
-        transform-origin: top left;
-        transition: transform 0.1s ease;
+      /* Tooltip */
+      #hle-tip {
+        all: initial;
+        display: none !important; position: fixed !important; z-index: 9999999 !important;
+        background: #1e1e2e !important; color: #e2e8f0 !important;
+        padding: 4px 8px !important; border-radius: 4px !important;
+        font-family: monospace !important; font-size: 11px !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        pointer-events: none !important; white-space: nowrap !important;
       }
     </style>
 </head>
-<body style="margin:0; padding:0;">
-    <!-- Toolbar -->
-    <div class="hle-toolbar" id="hle-toolbar">
-        <div class="hle-toolbar-logo">🎨</div>
-        <span class="hle-toolbar-title">HTML Live Edit</span>
-        <div class="hle-toolbar-divider"></div>
-        <button id="btn-edit" title="Toggle edit mode (Ctrl+E)">✏️ Edit</button>
-        <button id="btn-source" title="Toggle source view (Ctrl+U)">⟨/⟩ Source</button>
-        <div class="hle-toolbar-divider"></div>
-        <button id="btn-undo" title="Undo (Ctrl+Z)">↩ Undo</button>
-        <button id="btn-redo" title="Redo (Ctrl+Y)">↪ Redo</button>
-        <div class="hle-toolbar-divider"></div>
-        <button id="btn-save" class="hle-save-btn" title="Save (Ctrl+S)">💾 Save</button>
+
+<body${bodyAttrs} class="hle-body">
+
+    <!-- HLE Toolbar -->
+    <div id="hle-toolbar" data-hle="chrome">
+        <div class="hle-logo">🎨</div>
+        <span class="hle-title">Live Edit</span>
+        <div class="hle-divider"></div>
+        <button id="hle-btn-edit" title="Ctrl+E">✏️ Edit</button>
+        <button id="hle-btn-src" title="Ctrl+U">⟨/⟩</button>
+        <div class="hle-divider"></div>
+        <button id="hle-btn-undo" title="Ctrl+Z">↩</button>
+        <button id="hle-btn-redo" title="Ctrl+Y">↪</button>
+        <div class="hle-divider"></div>
+        <button id="hle-btn-save" class="hle-save" title="Ctrl+S">💾</button>
         <div class="hle-spacer"></div>
-        <div class="hle-zoom-control">
-          <button id="btn-zoom-out" title="Zoom out">−</button>
-          <span class="hle-zoom-value" id="zoom-value">100%</span>
-          <button id="btn-zoom-in" title="Zoom in">+</button>
-          <button id="btn-zoom-fit" title="Fit to width">⊞</button>
+        <div class="hle-zoom">
+          <button id="hle-btn-zo" title="Zoom out">−</button>
+          <span class="hle-zoom-val" id="hle-zoom-val">100%</span>
+          <button id="hle-btn-zi" title="Zoom in">+</button>
+          <button id="hle-btn-zf" title="Reset">⊞</button>
         </div>
-        <div class="hle-toolbar-divider"></div>
-        <span class="hle-info-badge" id="mode-badge">Preview</span>
-        <span class="hle-info-badge" id="edit-count">0 edits</span>
+        <div class="hle-divider"></div>
+        <span class="hle-badge" id="hle-badge-mode">Preview</span>
+        <span class="hle-badge" id="hle-badge-count">0 edits</span>
     </div>
 
-    <!-- Content area (original HTML body content goes here) -->
-    <div class="hle-content-wrapper" id="hle-content">
-        ${bodyContent}
+    <!-- Original body content -->
+    ${bodyContent}
+
+    <!-- Source editor -->
+    <div id="hle-source-wrap" data-hle="chrome">
+        <textarea id="hle-src-text" spellcheck="false"></textarea>
     </div>
 
-    <!-- Source editor (hidden by default) -->
-    <div class="hle-source-editor" id="hle-source-editor">
-        <textarea id="source-textarea" spellcheck="false"></textarea>
-    </div>
-
-    <!-- Element tooltip -->
-    <div class="hle-element-tooltip" id="hle-tooltip">
-        <span class="hle-tag-name"></span><span class="hle-class-name"></span><span class="hle-char-count"></span>
-    </div>
+    <!-- Tooltip -->
+    <div id="hle-tip" data-hle="chrome"></div>
 
     <!-- Status bar -->
-    <div class="hle-status-bar" id="hle-statusbar">
-        <div class="hle-status-item">
-            <span class="hle-status-dot" id="status-dot"></span>
-            <span id="status-text">Ready</span>
-        </div>
-        <div class="hle-status-item" id="status-file">${fileName}</div>
-        <div class="hle-status-spacer"></div>
-        <div class="hle-status-item" id="status-hint">Double-click text to edit</div>
+    <div id="hle-statusbar" data-hle="chrome">
+        <span class="hle-dot" id="hle-dot"></span>
+        <span id="hle-status">Ready</span>
+        <span style="flex:1"></span>
+        <span>${fileName}</span>
+        <span style="flex:1"></span>
+        <span id="hle-hint">Double-click to edit</span>
     </div>
 
     <script nonce="${nonce}">
-        (function() {
-            var vscodeApi = acquireVsCodeApi();
-            var editMode = false;
-            var sourceMode = false;
-            var editCount = 0;
-            var zoomLevel = 100;
-            var undoStack = [];
-            var redoStack = [];
-            var MAX_UNDO = 50;
+    (function(){
+        var vscode = acquireVsCodeApi();
+        var editMode = false, sourceMode = false, editCount = 0, zoomLevel = 100;
+        var undoStack = [], redoStack = [], MAX_UNDO = 50;
 
-            // Store the ORIGINAL full HTML for save reconstruction
-            var originalHeadContent = ${JSON.stringify(headContent)};
-            var originalHtmlLang = ${JSON.stringify(htmlLang)};
+        // Store original head for reconstruction
+        var savedHead = ${JSON.stringify(headContent)};
+        var savedDoctype = ${JSON.stringify(doctype)};
+        var savedHtmlAttrs = ${JSON.stringify(htmlAttrs)};
+        var savedBodyAttrs = ${JSON.stringify(bodyAttrs)};
 
-            var contentEl = document.getElementById('hle-content');
-            var sourceEditor = document.getElementById('hle-source-editor');
-            var sourceTextarea = document.getElementById('source-textarea');
-            var modeBadge = document.getElementById('mode-badge');
-            var editCountBadge = document.getElementById('edit-count');
-            var statusDot = document.getElementById('status-dot');
-            var statusText = document.getElementById('status-text');
-            var statusHint = document.getElementById('status-hint');
-            var tooltipEl = document.getElementById('hle-tooltip');
-            var toolbar = document.getElementById('hle-toolbar');
-            var statusbar = document.getElementById('hle-statusbar');
+        var badgeMode = document.getElementById('hle-badge-mode');
+        var badgeCount = document.getElementById('hle-badge-count');
+        var dot = document.getElementById('hle-dot');
+        var statusEl = document.getElementById('hle-status');
+        var hintEl = document.getElementById('hle-hint');
+        var tipEl = document.getElementById('hle-tip');
 
-            // ─── Mark editable elements ───
-            function markEditables() {
-                var textSelectors = [
-                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                    'p', 'span', 'label', 'figcaption', 'blockquote', 'cite',
-                    'li', 'dt', 'dd', 'summary',
-                    'td', 'th', 'caption',
-                    'strong', 'em', 'b', 'i', 'u', 'mark', 'small', 'sub', 'sup',
-                    'a', 'abbr', 'time',
-                    '.kpi-label', '.kpi-value', '.subtitle',
-                    '.figure-caption', '.highlight',
-                    '.section h2', '.section h3'
-                ].join(', ');
-
-                var elements = contentEl.querySelectorAll(textSelectors);
-                elements.forEach(function(el) {
-                    // Skip toolbar/statusbar elements
-                    if (el.closest('.hle-toolbar') || el.closest('.hle-status-bar')) return;
-                    // Skip if empty
-                    if (!el.textContent.trim()) return;
-                    // Skip if contains images (edit those separately)
-                    if (el.querySelector('img')) return;
-                    // Skip if already marked
-                    if (el.classList.contains('hle-editable')) return;
-                    // Skip if parent is already editable (avoid nested)
-                    if (el.parentElement && el.parentElement.classList.contains('hle-editable')) return;
-
-                    el.classList.add('hle-editable');
-
-                    el.addEventListener('dblclick', function(e) {
-                        if (!editMode) toggleEditMode();
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        pushUndo();
-                        el.contentEditable = 'true';
-                        el.classList.add('hle-editing');
-                        el.focus();
-
-                        var range = document.createRange();
-                        range.selectNodeContents(el);
-                        var sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    });
-
-                    el.addEventListener('blur', function() {
-                        el.contentEditable = 'false';
-                        el.classList.remove('hle-editing');
-                    });
-
-                    el.addEventListener('input', function() {
-                        editCount++;
-                        editCountBadge.textContent = editCount + ' edits';
-                        editCountBadge.classList.add('hle-dirty-badge');
-                        editCountBadge.classList.remove('hle-saved-badge');
-                    });
-                });
-
-                // Make images replaceable
-                var images = contentEl.querySelectorAll('img');
-                images.forEach(function(img) {
-                    if (img.classList.contains('hle-img-editable')) return;
-                    img.classList.add('hle-img-editable');
-
-                    img.addEventListener('dblclick', function(e) {
-                        if (!editMode) toggleEditMode();
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        pushUndo();
-                        img.classList.add('hle-img-editing');
-
-                        var src = img.getAttribute('src') || '';
-                        vscodeApi.postMessage({ type: 'replaceImage', src: src });
-                    });
-                });
+        // ─── Mark editable elements ───
+        function markEditables() {
+            var sel = 'h1,h2,h3,h4,h5,h6,p,span,label,figcaption,blockquote,cite,' +
+                'li,dt,dd,summary,td,th,caption,' +
+                'strong,em,b,i,u,mark,small,sub,sup,' +
+                'a,abbr,time,' +
+                '.kpi-label,.kpi-value,.subtitle,.figure-caption,.highlight';
+            var els = document.querySelectorAll(sel);
+            for (var i = 0; i < els.length; i++) {
+                var el = els[i];
+                if (el.closest('[data-hle]')) continue;
+                if (!el.textContent.trim()) continue;
+                if (el.querySelector('img')) continue;
+                if (el.classList.contains('hle-el')) continue;
+                if (el.parentElement && el.parentElement.classList.contains('hle-el')) continue;
+                el.classList.add('hle-el');
+                bindText(el);
             }
-
-            // Handle image replacement from extension
-            window.addEventListener('message', function(event) {
-                var msg = event.data;
-                if (msg.type === 'imageSelected') {
-                    var imgs = contentEl.querySelectorAll('img.hle-img-editing');
-                    imgs.forEach(function(img) {
-                        img.setAttribute('src', msg.dataUri);
-                        img.classList.remove('hle-img-editing');
-                    });
-                    editCount++;
-                    editCountBadge.textContent = editCount + ' edits';
-                    editCountBadge.classList.add('hle-dirty-badge');
-                }
-            });
-
-            // ─── Hover tooltip ───
-            contentEl.addEventListener('mouseover', function(e) {
-                if (!editMode) return;
-                var el = e.target;
-                if (el.classList.contains('hle-editable') || el.classList.contains('hle-img-editable')) {
-                    var tagName = el.tagName.toLowerCase();
-                    var classes = Array.from(el.classList).filter(function(c) {
-                        return c !== 'hle-editable' && c !== 'hle-img-editable' && c !== 'hle-editing' && c !== 'hle-img-editing';
-                    }).join('.');
-                    var tooltipHtml = '<span class="hle-tag-name">&lt;' + tagName + '&gt;</span>';
-                    if (classes) tooltipHtml += '<span class="hle-class-name">.' + classes + '</span>';
-                    tooltipHtml += '<span class="hle-char-count">' + el.textContent.trim().length + ' chars</span>';
-
-                    tooltipEl.innerHTML = tooltipHtml;
-                    tooltipEl.style.display = 'block';
-                    tooltipEl.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
-                    tooltipEl.style.top = Math.max(e.clientY - 30, 50) + 'px';
-                }
-            });
-
-            contentEl.addEventListener('mouseout', function(e) {
-                if (e.target.classList.contains('hle-editable') || e.target.classList.contains('hle-img-editable')) {
-                    tooltipEl.style.display = 'none';
-                }
-            });
-
-            // ─── Undo/Redo ───
-            function pushUndo() {
-                undoStack.push(contentEl.innerHTML);
-                if (undoStack.length > MAX_UNDO) undoStack.shift();
-                redoStack = [];
+            var imgs = document.querySelectorAll('img');
+            for (var j = 0; j < imgs.length; j++) {
+                if (imgs[j].closest('[data-hle]')) continue;
+                if (imgs[j].classList.contains('hle-img')) continue;
+                imgs[j].classList.add('hle-img');
+                bindImg(imgs[j]);
             }
+        }
 
-            function doUndo() {
-                if (undoStack.length === 0) return;
-                redoStack.push(contentEl.innerHTML);
-                var prev = undoStack.pop();
-                contentEl.innerHTML = prev;
-                markEditables();
-                editCount = Math.max(0, editCount - 1);
-                editCountBadge.textContent = editCount + ' edits';
-            }
-
-            function doRedo() {
-                if (redoStack.length === 0) return;
-                undoStack.push(contentEl.innerHTML);
-                var next = redoStack.pop();
-                contentEl.innerHTML = next;
-                markEditables();
+        function bindText(el) {
+            el.addEventListener('dblclick', function(e) {
+                if (!editMode) toggleEdit();
+                e.preventDefault(); e.stopPropagation();
+                pushUndo();
+                el.contentEditable = 'true';
+                el.classList.add('hle-el-active');
+                el.focus();
+                var r = document.createRange();
+                r.selectNodeContents(el);
+                var s = window.getSelection();
+                s.removeAllRanges(); s.addRange(r);
+            });
+            el.addEventListener('blur', function() {
+                el.contentEditable = 'false';
+                el.classList.remove('hle-el-active');
+            });
+            el.addEventListener('input', function() {
                 editCount++;
-                editCountBadge.textContent = editCount + ' edits';
-            }
-
-            // ─── Edit Mode ───
-            function toggleEditMode() {
-                editMode = !editMode;
-                var btn = document.getElementById('btn-edit');
-
-                if (editMode) {
-                    btn.textContent = '👁 View';
-                    btn.classList.add('hle-active');
-                    modeBadge.textContent = 'Editing';
-                    modeBadge.classList.add('hle-editing-badge');
-                    statusDot.classList.add('hle-dot-editing');
-                    statusDot.classList.remove('hle-dot-active');
-                    statusText.textContent = 'Editing';
-                    statusHint.textContent = 'Double-click: text edit / image replace';
-                } else {
-                    btn.textContent = '✏️ Edit';
-                    btn.classList.remove('hle-active');
-                    modeBadge.textContent = 'Preview';
-                    modeBadge.classList.remove('hle-editing-badge');
-                    statusDot.classList.remove('hle-dot-editing');
-                    statusText.textContent = 'Preview';
-                    statusHint.textContent = 'Double-click text to edit';
-
-                    contentEl.querySelectorAll('.hle-editing').forEach(function(el) {
-                        el.contentEditable = 'false';
-                        el.classList.remove('hle-editing');
-                    });
-                    contentEl.querySelectorAll('.hle-img-editing').forEach(function(el) {
-                        el.classList.remove('hle-img-editing');
-                    });
-                }
-            }
-
-            // ─── Source Mode ───
-            function toggleSourceMode() {
-                sourceMode = !sourceMode;
-                var btn = document.getElementById('btn-source');
-
-                if (sourceMode) {
-                    btn.textContent = '👁 Preview';
-                    btn.classList.add('hle-active');
-
-                    sourceTextarea.value = getCurrentFullHtml();
-
-                    contentEl.style.display = 'none';
-                    sourceEditor.style.display = 'block';
-                    sourceTextarea.focus();
-
-                    modeBadge.textContent = 'Source';
-                    modeBadge.classList.remove('hle-editing-badge');
-                    statusDot.classList.remove('hle-dot-editing');
-                    statusText.textContent = 'Source';
-                    statusHint.textContent = 'Edit HTML source directly';
-                } else {
-                    btn.textContent = '⟨/⟩ Source';
-                    btn.classList.remove('hle-active');
-
-                    // Apply source edits back
-                    var newSource = sourceTextarea.value;
-                    var newBody = newSource.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);
-                    if (newBody) {
-                        contentEl.innerHTML = newBody[1];
-                    } else {
-                        contentEl.innerHTML = newSource;
-                    }
-                    // Also update head
-                    var newHead = newSource.match(/<head[^>]*>([\\s\\S]*?)<\\/head>/i);
-                    if (newHead) {
-                        originalHeadContent = newHead[1];
-                    }
-
-                    sourceEditor.style.display = 'none';
-                    contentEl.style.display = 'block';
-                    markEditables();
-                    applyZoom();
-
-                    modeBadge.textContent = editMode ? 'Editing' : 'Preview';
-                    if (editMode) modeBadge.classList.add('hle-editing-badge');
-                    statusText.textContent = editMode ? 'Editing' : 'Preview';
-                    statusHint.textContent = 'Double-click text to edit';
-                }
-            }
-
-            // ─── Reconstruct full HTML for saving ───
-            function getCurrentFullHtml() {
-                if (sourceMode) {
-                    return sourceTextarea.value;
-                }
-
-                // Clone content to clean up editor artifacts
-                var clone = contentEl.cloneNode(true);
-                clone.querySelectorAll('.hle-editable, .hle-img-editable').forEach(function(el) {
-                    el.classList.remove('hle-editable', 'hle-img-editable', 'hle-editing', 'hle-img-editing');
-                    el.removeAttribute('contenteditable');
-                    // Clean up empty class attr
-                    if (el.getAttribute('class') === '') el.removeAttribute('class');
-                });
-                // Remove empty style attributes we may have added
-                clone.querySelectorAll('[style=""]').forEach(function(el) {
-                    el.removeAttribute('style');
-                });
-
-                var bodyHtml = clone.innerHTML;
-
-                // Reconstruct full HTML
-                var full = '<!DOCTYPE html>\\n<html' + originalHtmlLang + '>\\n';
-                full += '<head>\\n' + originalHeadContent + '\\n</head>\\n';
-                full += '<body>\\n' + bodyHtml + '\\n</body>\\n';
-                full += '</html>';
-
-                return full;
-            }
-
-            // ─── Save ───
-            function doSave() {
-                var fullHtml = getCurrentFullHtml();
-                vscodeApi.postMessage({ type: 'save', content: fullHtml });
-
-                editCount = 0;
-                editCountBadge.textContent = 'Saved!';
-                editCountBadge.classList.add('hle-saved-badge');
-                editCountBadge.classList.remove('hle-dirty-badge');
-                setTimeout(function() {
-                    editCountBadge.textContent = '0 edits';
-                    editCountBadge.classList.remove('hle-saved-badge');
-                }, 2000);
-
-                undoStack = [];
-                redoStack = [];
-            }
-
-            // ─── Zoom ───
-            function applyZoom() {
-                if (zoomLevel === 100) {
-                    contentEl.style.transform = '';
-                    contentEl.style.width = '';
-                } else {
-                    contentEl.style.transform = 'scale(' + (zoomLevel / 100) + ')';
-                    contentEl.style.width = (10000 / zoomLevel) + '%';
-                }
-                document.getElementById('zoom-value').textContent = zoomLevel + '%';
-            }
-
-            // ─── Keyboard shortcuts ───
-            document.addEventListener('keydown', function(e) {
-                if (e.ctrlKey || e.metaKey) {
-                    if (e.key === 's') { e.preventDefault(); doSave(); }
-                    else if (e.key === 'e') { e.preventDefault(); toggleEditMode(); }
-                    else if (e.key === 'u') { e.preventDefault(); toggleSourceMode(); }
-                    else if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); }
-                    else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); doRedo(); }
-                    else if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomLevel = Math.min(200, zoomLevel + 10); applyZoom(); }
-                    else if (e.key === '-') { e.preventDefault(); zoomLevel = Math.max(30, zoomLevel - 10); applyZoom(); }
-                    else if (e.key === '0') { e.preventDefault(); zoomLevel = 100; applyZoom(); }
-                }
+                badgeCount.textContent = editCount + ' edits';
+                badgeCount.className = 'hle-badge hle-badge-dirty';
             });
+        }
 
-            // ─── Button bindings ───
-            document.getElementById('btn-edit').addEventListener('click', toggleEditMode);
-            document.getElementById('btn-source').addEventListener('click', toggleSourceMode);
-            document.getElementById('btn-save').addEventListener('click', doSave);
-            document.getElementById('btn-undo').addEventListener('click', doUndo);
-            document.getElementById('btn-redo').addEventListener('click', doRedo);
-            document.getElementById('btn-zoom-in').addEventListener('click', function() { zoomLevel = Math.min(200, zoomLevel + 10); applyZoom(); });
-            document.getElementById('btn-zoom-out').addEventListener('click', function() { zoomLevel = Math.max(30, zoomLevel - 10); applyZoom(); });
-            document.getElementById('btn-zoom-fit').addEventListener('click', function() { zoomLevel = 100; applyZoom(); });
+        function bindImg(img) {
+            img.addEventListener('dblclick', function(e) {
+                if (!editMode) toggleEdit();
+                e.preventDefault(); e.stopPropagation();
+                pushUndo();
+                img.classList.add('hle-img-active');
+                vscode.postMessage({ type: 'replaceImage', src: img.getAttribute('src') || '' });
+            });
+        }
 
-            // ─── Initialize ───
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'imageSelected') {
+                var imgs = document.querySelectorAll('.hle-img-active');
+                for (var i = 0; i < imgs.length; i++) {
+                    imgs[i].setAttribute('src', e.data.dataUri);
+                    imgs[i].classList.remove('hle-img-active');
+                }
+                editCount++;
+                badgeCount.textContent = editCount + ' edits';
+                badgeCount.className = 'hle-badge hle-badge-dirty';
+            }
+        });
+
+        // ─── Tooltip ───
+        document.addEventListener('mouseover', function(e) {
+            if (!editMode) return;
+            var el = e.target;
+            if (!el.classList.contains('hle-el') && !el.classList.contains('hle-img')) return;
+            var tag = el.tagName.toLowerCase();
+            var cls = Array.from(el.classList).filter(function(c){ return c!=='hle-el'&&c!=='hle-img'&&c!=='hle-el-active'&&c!=='hle-img-active'; }).join('.');
+            tipEl.textContent = '<' + tag + '>' + (cls ? '.' + cls : '') + ' [' + el.textContent.trim().length + 'ch]';
+            tipEl.style.display = 'block';
+            tipEl.style.left = Math.min(e.clientX + 10, window.innerWidth - 200) + 'px';
+            tipEl.style.top = Math.max(e.clientY - 28, 48) + 'px';
+        });
+        document.addEventListener('mouseout', function(e) {
+            if (e.target.classList.contains('hle-el') || e.target.classList.contains('hle-img')) {
+                tipEl.style.display = 'none';
+            }
+        });
+
+        // ─── Undo/Redo ───
+        function pushUndo() {
+            // Save the body content without chrome
+            undoStack.push(getBodyContent());
+            if (undoStack.length > MAX_UNDO) undoStack.shift();
+            redoStack = [];
+        }
+
+        function doUndo() {
+            if (!undoStack.length) return;
+            redoStack.push(getBodyContent());
+            var prev = undoStack.pop();
+            setBodyContent(prev);
+            editCount = Math.max(0, editCount - 1);
+            badgeCount.textContent = editCount + ' edits';
+        }
+
+        function doRedo() {
+            if (!redoStack.length) return;
+            undoStack.push(getBodyContent());
+            var next = redoStack.pop();
+            setBodyContent(next);
+            editCount++;
+            badgeCount.textContent = editCount + ' edits';
+        }
+
+        // Get body innerHTML excluding chrome elements
+        function getBodyContent() {
+            var clone = document.body.cloneNode(true);
+            var chrome = clone.querySelectorAll('[data-hle]');
+            for (var i = 0; i < chrome.length; i++) chrome[i].remove();
+            // Remove hle classes/attrs from content elements
+            var marked = clone.querySelectorAll('.hle-el,.hle-img');
+            for (var j = 0; j < marked.length; j++) {
+                marked[j].classList.remove('hle-el','hle-el-active','hle-img','hle-img-active');
+                marked[j].removeAttribute('contenteditable');
+                if (marked[j].classList.length === 0) marked[j].removeAttribute('class');
+            }
+            return clone.innerHTML;
+        }
+
+        function setBodyContent(html) {
+            // Remove old content (not chrome)
+            var children = document.body.children;
+            for (var i = children.length - 1; i >= 0; i--) {
+                if (!children[i].hasAttribute('data-hle')) children[i].remove();
+            }
+            // Insert new content before first chrome element
+            var firstChrome = document.body.querySelector('[data-hle]');
+            var tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            while (tmp.firstChild) {
+                document.body.insertBefore(tmp.firstChild, firstChrome);
+            }
             markEditables();
-        })();
+        }
+
+        // ─── Edit toggle ───
+        function toggleEdit() {
+            editMode = !editMode;
+            var btn = document.getElementById('hle-btn-edit');
+            if (editMode) {
+                btn.textContent = '👁 View'; btn.classList.add('hle-active');
+                badgeMode.textContent = 'Editing'; badgeMode.className = 'hle-badge hle-badge-edit';
+                dot.className = 'hle-dot hle-dot-edit';
+                statusEl.textContent = 'Editing';
+                hintEl.textContent = 'Dbl-click: text/img';
+            } else {
+                btn.textContent = '✏️ Edit'; btn.classList.remove('hle-active');
+                badgeMode.textContent = 'Preview'; badgeMode.className = 'hle-badge';
+                dot.className = 'hle-dot';
+                statusEl.textContent = 'Preview';
+                hintEl.textContent = 'Double-click to edit';
+                var editing = document.querySelectorAll('.hle-el-active,.hle-img-active');
+                for (var i = 0; i < editing.length; i++) {
+                    editing[i].contentEditable = 'false';
+                    editing[i].classList.remove('hle-el-active','hle-img-active');
+                }
+            }
+        }
+
+        // ─── Source toggle ───
+        function toggleSource() {
+            sourceMode = !sourceMode;
+            var btn = document.getElementById('hle-btn-src');
+            var sw = document.getElementById('hle-source-wrap');
+            if (sourceMode) {
+                btn.textContent = '👁'; btn.classList.add('hle-active');
+                document.getElementById('hle-src-text').value = buildFullHtml();
+                sw.style.display = 'block';
+                badgeMode.textContent = 'Source'; badgeMode.className = 'hle-badge';
+                dot.className = 'hle-dot';
+                statusEl.textContent = 'Source';
+                hintEl.textContent = 'Edit raw HTML';
+            } else {
+                btn.textContent = '⟨/⟩'; btn.classList.remove('hle-active');
+                // Apply source back
+                var src = document.getElementById('hle-src-text').value;
+                var bm = src.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);
+                if (bm) {
+                    setBodyContent(bm[1]);
+                    var hm = src.match(/<head[^>]*>([\\s\\S]*?)<\\/head>/i);
+                    if (hm) savedHead = hm[1];
+                }
+                sw.style.display = 'none';
+                badgeMode.textContent = editMode ? 'Editing' : 'Preview';
+                if (editMode) badgeMode.className = 'hle-badge hle-badge-edit';
+                statusEl.textContent = editMode ? 'Editing' : 'Preview';
+                hintEl.textContent = 'Double-click to edit';
+            }
+        }
+
+        // ─── Build full HTML for save/source ───
+        function buildFullHtml() {
+            if (sourceMode) return document.getElementById('hle-src-text').value;
+            var bodyHtml = getBodyContent();
+            return savedDoctype + '\\n<html' + savedHtmlAttrs + '>\\n<head>\\n' + savedHead + '\\n</head>\\n<body' + savedBodyAttrs + '>\\n' + bodyHtml + '\\n</body>\\n</html>';
+        }
+
+        // ─── Save ───
+        function doSave() {
+            vscode.postMessage({ type: 'save', content: buildFullHtml() });
+            editCount = 0;
+            badgeCount.textContent = 'Saved!'; badgeCount.className = 'hle-badge hle-badge-saved';
+            setTimeout(function(){ badgeCount.textContent = '0 edits'; badgeCount.className = 'hle-badge'; }, 2000);
+            undoStack = []; redoStack = [];
+        }
+
+        // ─── Zoom ───
+        function applyZoom() {
+            // Zoom by scaling the body content, keeping chrome at normal size
+            var allEls = document.body.children;
+            for (var i = 0; i < allEls.length; i++) {
+                var el = allEls[i];
+                if (el.hasAttribute('data-hle')) continue; // skip chrome
+                if (zoomLevel === 100) {
+                    el.style.transform = '';
+                    el.style.transformOrigin = '';
+                    el.style.width = '';
+                } else {
+                    el.style.transform = 'scale(' + (zoomLevel/100) + ')';
+                    el.style.transformOrigin = 'top left';
+                    el.style.width = (10000/zoomLevel) + '%';
+                }
+            }
+            document.getElementById('hle-zoom-val').textContent = zoomLevel + '%';
+        }
+
+        // ─── Keyboard ───
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 's': e.preventDefault(); doSave(); break;
+                    case 'e': e.preventDefault(); toggleEdit(); break;
+                    case 'u': e.preventDefault(); toggleSource(); break;
+                    case 'z': if (!e.shiftKey) { e.preventDefault(); doUndo(); } break;
+                    case 'y': e.preventDefault(); doRedo(); break;
+                    case '=': case '+': e.preventDefault(); zoomLevel = Math.min(200, zoomLevel+10); applyZoom(); break;
+                    case '-': e.preventDefault(); zoomLevel = Math.max(30, zoomLevel-10); applyZoom(); break;
+                    case '0': e.preventDefault(); zoomLevel = 100; applyZoom(); break;
+                }
+            }
+        });
+
+        // ─── Button bindings ───
+        document.getElementById('hle-btn-edit').onclick = toggleEdit;
+        document.getElementById('hle-btn-src').onclick = toggleSource;
+        document.getElementById('hle-btn-save').onclick = doSave;
+        document.getElementById('hle-btn-undo').onclick = doUndo;
+        document.getElementById('hle-btn-redo').onclick = doRedo;
+        document.getElementById('hle-btn-zi').onclick = function(){ zoomLevel = Math.min(200, zoomLevel+10); applyZoom(); };
+        document.getElementById('hle-btn-zo').onclick = function(){ zoomLevel = Math.max(30, zoomLevel-10); applyZoom(); };
+        document.getElementById('hle-btn-zf').onclick = function(){ zoomLevel = 100; applyZoom(); };
+
+        // ─── Init ───
+        markEditables();
+    })();
     </script>
 </body>
 </html>`;
