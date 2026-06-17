@@ -2,7 +2,7 @@
   "name": "html-live-edit",
   "displayName": "HTML Live Edit",
   "description": "Visual WYSIWYG editor for HTML files - double-click text to edit, source view, undo/redo, zoom, image replacement",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "xjb",
   "repository": {
     "type": "git",
