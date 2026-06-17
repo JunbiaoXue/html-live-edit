@@ -32,26 +32,30 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
     webviewPanel.webview.html = this.buildEditorHtml(webviewPanel.webview, htmlContent, document.uri);
 
     webviewPanel.webview.onDidReceiveMessage(
-      async (message) => {
-        if (message.type === 'save') {
-          await this.saveDocument(document.uri, message.content);
-          vscode.window.showInformationMessage('✅ HTML saved successfully!');
-        } else if (message.type === 'replaceImage') {
-          const fileUris = await vscode.window.showOpenDialog({
-            canSelectMany: false,
-            filters: { 'Images': ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'] },
-            title: 'Select replacement image'
-          });
-          if (fileUris && fileUris.length > 0) {
-            const imageData = fs.readFileSync(fileUris[0].fsPath);
-            const ext = path.extname(fileUris[0].fsPath).slice(1);
-            const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-            const base64 = imageData.toString('base64');
-            const dataUri = `data:${mimeType};base64,${base64}`;
-            webviewPanel.webview.postMessage({ type: 'imageSelected', src: message.src, dataUri });
-          }
+    async (message) => {
+      if (message.type === 'save') {
+        await this.saveDocument(document.uri, message.content);
+        vscode.window.showInformationMessage('✅ HTML saved successfully!');
+      } else if (message.type === 'replaceImage') {
+        const fileUris = await vscode.window.showOpenDialog({
+          canSelectMany: false,
+          filters: { 'Images': ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'] },
+          title: 'Select replacement image'
+        });
+        if (fileUris && fileUris.length > 0) {
+          const imageData = fs.readFileSync(fileUris[0].fsPath);
+          const ext = path.extname(fileUris[0].fsPath).slice(1);
+          const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          const base64 = imageData.toString('base64');
+          const dataUri = `data:${mimeType};base64,${base64}`;
+          webviewPanel.webview.postMessage({ type: 'imageSelected', src: message.src, dataUri });
         }
-      },
+      } else if (message.type === 'refresh') {
+        // Re-read the file and rebuild the entire webview
+        const freshContent = fs.readFileSync(document.uri.fsPath, 'utf-8');
+        webviewPanel.webview.html = this.buildEditorHtml(webviewPanel.webview, freshContent, document.uri);
+      }
+    },
       undefined,
       this.context.subscriptions
     );
@@ -297,6 +301,7 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
         <div class="hle-divider"></div>
         <button id="hle-btn-edit" title="Ctrl+E">✏️ Edit</button>
         <button id="hle-btn-src" title="Ctrl+U">⟨/⟩</button>
+        <button id="hle-btn-refresh" title="Refresh from disk (Ctrl+R)">🔄</button>
         <div class="hle-divider"></div>
         <button id="hle-btn-undo" title="Ctrl+Z">↩</button>
         <button id="hle-btn-redo" title="Ctrl+Y">↪</button>
@@ -594,6 +599,11 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
             document.getElementById('hle-zoom-val').textContent = zoomLevel + '%';
         }
 
+        // ─── Refresh ───
+        function doRefresh() {
+            vscode.postMessage({ type: 'refresh' });
+        }
+
         // ─── Keyboard ───
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey || e.metaKey) {
@@ -601,6 +611,7 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
                     case 's': e.preventDefault(); doSave(); break;
                     case 'e': e.preventDefault(); toggleEdit(); break;
                     case 'u': e.preventDefault(); toggleSource(); break;
+                    case 'r': e.preventDefault(); doRefresh(); break;
                     case 'z': if (!e.shiftKey) { e.preventDefault(); doUndo(); } break;
                     case 'y': e.preventDefault(); doRedo(); break;
                     case '=': case '+': e.preventDefault(); zoomLevel = Math.min(200, zoomLevel+10); applyZoom(); break;
@@ -616,6 +627,7 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
         document.getElementById('hle-btn-save').onclick = doSave;
         document.getElementById('hle-btn-undo').onclick = doUndo;
         document.getElementById('hle-btn-redo').onclick = doRedo;
+        document.getElementById('hle-btn-refresh').onclick = doRefresh;
         document.getElementById('hle-btn-zi').onclick = function(){ zoomLevel = Math.min(200, zoomLevel+10); applyZoom(); };
         document.getElementById('hle-btn-zo').onclick = function(){ zoomLevel = Math.max(30, zoomLevel-10); applyZoom(); };
         document.getElementById('hle-btn-zf').onclick = function(){ zoomLevel = 100; applyZoom(); };
