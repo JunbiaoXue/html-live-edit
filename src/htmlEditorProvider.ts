@@ -352,7 +352,11 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
         // ─── Mark editable elements ───
         function markEditables() {
-            var sel = 'h1,h2,h3,h4,h5,h6,p,span,label,figcaption,blockquote,cite,' +
+            // Include callout containers before their inline children. A full
+            // callout must be editable as one unit; otherwise a leading <b>
+            // captures only its own text and leaves the following text locked.
+            var sel = 'div.note,div.warn,.note,.warn,' +
+                'h1,h2,h3,h4,h5,h6,p,span,label,figcaption,blockquote,cite,' +
                 'li,dt,dd,summary,td,th,caption,' +
                 'strong,em,b,i,u,mark,small,sub,sup,' +
                 'a,abbr,time,' +

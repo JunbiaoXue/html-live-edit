@@ -67,6 +67,10 @@ npx vsce package
 - Custom components / 自定义组件：`.kpi-label`, `.kpi-value`, `.subtitle`, `.figure-caption`, `.insight-box strong`, `.highlight`
 - Images / 图片：`img`（double-click to replace / 双击替换）
 
+## What's New in v1.2.2 / v1.2.2 更新
+
+- 🛠️ Callout containers such as `.note` and `.warn` are now editable as complete blocks, including mixed bold labels and following text. / `.note`、`.warn` 等提示框现在可作为完整内容块编辑，包括加粗标签及其后的正文。
+
 ## What's New in v1.2.1 / v1.2.1 更新
 
 - 🛠️ Supports explicit `<head>...</head>` documents, HTML5 documents with an implicit head, and HTML fragments without `<html>` / `<body>` wrappers. / 支持显式 `<head>...</head>` 文档、使用隐式 head 的 HTML5 文档，以及没有 `<html>` / `<body>` 外壳的 HTML 片段。
