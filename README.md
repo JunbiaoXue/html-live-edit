@@ -65,6 +65,11 @@ npx vsce package
 - Custom components: `.kpi-label`, `.kpi-value`, `.subtitle`, `.figure-caption`, `.insight-box strong`, `.highlight`
 - Images: `img` (double-click to replace)
 
+## What's New in v1.2.1
+
+- 🛠️ Supports explicit `<head>...</head>` documents, HTML5 documents with an implicit head, and HTML fragments without `<html>` / `<body>` wrappers.
+- 🛠️ Preserves leading metadata, styles, scripts, titles, links, and base URLs when opening browser-valid HTML that omits `<head>`.
+
 ## What's New in v1.1.0
 
 - 🆕 Source code view (Ctrl+U) for direct HTML editing

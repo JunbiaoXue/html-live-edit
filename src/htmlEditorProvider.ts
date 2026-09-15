@@ -72,18 +72,9 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
     }));
     const fileName = documentUri.path.split('/').pop() || 'document.html';
 
-    // Parse original HTML into parts
-    const doctypeMatch = htmlContent.match(/<!DOCTYPE[^>]*>/i);
-    const htmlOpenMatch = htmlContent.match(/<html([^>]*)>/i);
-    const headMatch = htmlContent.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
-    const bodyOpenMatch = htmlContent.match(/<body([^>]*)>/i);
-    const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-
-    const doctype = doctypeMatch ? doctypeMatch[0] : '<!DOCTYPE html>';
-    const htmlAttrs = htmlOpenMatch ? htmlOpenMatch[1] : '';
-    const headContent = headMatch ? headMatch[1] : '';
-    const bodyAttrs = bodyOpenMatch ? bodyOpenMatch[1] : '';
-    const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
+    // Tolerant document splitter for explicit documents, HTML5 implicit heads,
+    // and fragments. An omitted <head> is browser-valid HTML.
+    const { doctype, htmlAttrs, headContent, bodyAttrs, bodyContent } = this.parseHtmlDocument(htmlContent);
 
     // Reconstruct: inject our chrome into the original HTML structure
     // This ensures the page renders exactly as the author intended
@@ -638,6 +629,88 @@ export class HtmlEditorProvider implements vscode.CustomReadonlyEditorProvider {
     </script>
 </body>
 </html>`;
+  }
+
+  private parseHtmlDocument(htmlContent: string): {
+    doctype: string;
+    htmlAttrs: string;
+    headContent: string;
+    bodyAttrs: string;
+    bodyContent: string;
+  } {
+    const doctypeMatch = htmlContent.match(/<!DOCTYPE[^>]*>/i);
+    const htmlOpenMatch = htmlContent.match(/<html\b([^>]*)>/i);
+    const headMatch = htmlContent.match(/<head\b[^>]*>([\s\S]*?)<\/head\s*>/i);
+    const bodyOpenMatch = htmlContent.match(/<body\b([^>]*)>/i);
+    const bodyMatch = htmlContent.match(/<body\b[^>]*>([\s\S]*?)(?:<\/body\s*>|$)/i);
+    const doctype = doctypeMatch ? doctypeMatch[0] : '<!DOCTYPE html>';
+    const htmlAttrs = htmlOpenMatch ? htmlOpenMatch[1] : '';
+    const bodyAttrs = bodyOpenMatch ? bodyOpenMatch[1] : '';
+
+    if (headMatch) {
+      return {
+        doctype,
+        htmlAttrs,
+        headContent: headMatch[1],
+        bodyAttrs,
+        bodyContent: bodyMatch ? bodyMatch[1] : this.stripDocumentShell(htmlContent)
+      };
+    }
+
+    const bodyStart = htmlContent.search(/<body\b/i);
+    if (bodyStart >= 0) {
+      const split = this.splitImplicitHead(htmlContent.slice(0, bodyStart));
+      return {
+        doctype,
+        htmlAttrs,
+        headContent: split.head,
+        bodyAttrs,
+        // Preserve non-metadata content before an explicit body, which browsers
+        // render in body rather than discarding.
+        bodyContent: split.body + (bodyMatch ? bodyMatch[1] : htmlContent.slice(bodyStart).replace(/^<body\b[^>]*>/i, ''))
+      };
+    }
+
+    const split = this.splitImplicitHead(this.stripDocumentShell(htmlContent));
+    return { doctype, htmlAttrs, headContent: split.head, bodyAttrs: '', bodyContent: split.body };
+  }
+
+  private stripDocumentShell(html: string): string {
+    return html
+      .replace(/<!DOCTYPE[^>]*>/ig, '')
+      .replace(/<\/?html\b[^>]*>/ig, '')
+      .replace(/<\/body\s*>/ig, '');
+  }
+
+  private splitImplicitHead(html: string): { head: string; body: string } {
+    // Parse leading metadata elements fully: style/script/title can contain
+    // arbitrary '<' text and cannot safely be handled as one-tag regexes.
+    const source = this.stripDocumentShell(html);
+    let pos = 0;
+    let head = '';
+    const consume = (end: number) => { head += source.slice(pos, end); pos = end; };
+
+    while (pos < source.length) {
+      const trivia = source.slice(pos).match(/^(?:\s|<!--[\s\S]*?-->)+/);
+      if (trivia) {
+        consume(pos + trivia[0].length);
+        continue;
+      }
+      const open = source.slice(pos).match(/^<(meta|base|link|style|script|title|noscript|template)\b[^>]*>/i);
+      if (!open) break;
+
+      const tag = open[1].toLowerCase();
+      const openEnd = pos + open[0].length;
+      if (tag === 'meta' || tag === 'base' || tag === 'link') {
+        consume(openEnd);
+        continue;
+      }
+      const close = new RegExp(`</${tag}\\s*>`, 'ig');
+      close.lastIndex = openEnd;
+      const found = close.exec(source);
+      consume(found ? found.index + found[0].length : source.length);
+    }
+    return { head, body: source.slice(pos) };
   }
 
   private getNonce(): string {
