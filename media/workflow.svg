@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">HTML Live Edit 工作流程</title>
+  <desc id="desc">从打开 HTML 文件，到可视化预览、双击编辑、保存修改并回写原文件的流程。</desc>
+  <rect width="1200" height="320" rx="28" fill="#f7f8fa"/>
+  <text x="600" y="52" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif" font-size="28" font-weight="700" fill="#1f2328">HTML Live Edit 工作流程</text>
+
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif">
+    <g transform="translate(55 105)">
+      <rect width="180" height="100" rx="18" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+      <text x="90" y="43" text-anchor="middle" font-size="21" font-weight="700" fill="#1f2328">① 打开 HTML</text>
+      <text x="90" y="70" text-anchor="middle" font-size="15" fill="#57606a">.html / .htm</text>
+    </g>
+
+    <path d="M245 155 H285" stroke="#8c959f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M276 146 L288 155 L276 164" fill="none" stroke="#8c959f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <g transform="translate(300 105)">
+      <rect width="180" height="100" rx="18" fill="#ffffff" stroke="#54aeff" stroke-width="2"/>
+      <text x="90" y="43" text-anchor="middle" font-size="21" font-weight="700" fill="#0969da">② 可视化预览</text>
+      <text x="90" y="70" text-anchor="middle" font-size="15" fill="#57606a">所见即所得</text>
+    </g>
+
+    <path d="M490 155 H530" stroke="#8c959f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M521 146 L533 155 L521 164" fill="none" stroke="#8c959f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <g transform="translate(545 105)">
+      <rect width="180" height="100" rx="18" fill="#ffffff" stroke="#2da44e" stroke-width="2"/>
+      <text x="90" y="43" text-anchor="middle" font-size="21" font-weight="700" fill="#1a7f37">③ 双击编辑</text>
+      <text x="90" y="70" text-anchor="middle" font-size="15" fill="#57606a">文本 / 图片</text>
+    </g>
+
+    <path d="M735 155 H775" stroke="#8c959f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M766 146 L778 155 L766 164" fill="none" stroke="#8c959f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <g transform="translate(790 105)">
+      <rect width="180" height="100" rx="18" fill="#ffffff" stroke="#bf8700" stroke-width="2"/>
+      <text x="90" y="43" text-anchor="middle" font-size="21" font-weight="700" fill="#9a6700">④ 保存修改</text>
+      <text x="90" y="70" text-anchor="middle" font-size="15" fill="#57606a">Ctrl / Cmd + S</text>
+    </g>
+
+    <path d="M980 155 H1020" stroke="#8c959f" stroke-width="3" stroke-linecap="round"/>
+    <path d="M1011 146 L1023 155 L1011 164" fill="none" stroke="#8c959f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <g transform="translate(1035 105)">
+      <rect width="110" height="100" rx="18" fill="#ffffff" stroke="#8250df" stroke-width="2"/>
+      <text x="55" y="43" text-anchor="middle" font-size="19" font-weight="700" fill="#6639ba">⑤ 回写</text>
+      <text x="55" y="70" text-anchor="middle" font-size="15" fill="#57606a">原文件</text>
+    </g>
+
+    <rect x="235" y="244" width="730" height="42" rx="21" fill="#ffffff" stroke="#d8dee4"/>
+    <text x="600" y="271" text-anchor="middle" font-size="16" fill="#57606a">保存时保留 head · CSS · scripts · title · metadata 等完整 HTML 结构</text>
+  </g>
+</svg>
